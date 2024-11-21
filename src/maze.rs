@@ -1,49 +1,149 @@
 pub mod maze {
+
+    #[derive(Debug, PartialEq, Clone, Copy)]
+    enum PositionPoint {
+        Parent((i32, i32)),
+        Children((i32, i32)),
+    }
+
+    impl PositionPoint {
+        // fn get_children_tuples(&self, children:PositionPoint)-> (i32, i32){
+        //     if let PositionPoint::Children(value) = children{
+        //         return value;
+        //     } else {
+        //         (-1, -1)
+        //     }
+        // }
+
+        fn parent_to_children(&self, parent:PositionPoint)-> Option<PositionPoint>{
+
+            if let PositionPoint::Parent(x) = parent{
+                Some( PositionPoint::Children(x))
+            } else {
+                None
+            }
+
+        }
+    }
+
     pub struct Maze{
         queue: Vec<(i32, i32)>,
         processed: Vec<(i32, i32)>,
         processing: Option<(i32, i32)>,
         start_position: (i32, i32),
         end_position: (i32, i32),
-        founded: bool,
+        children_end_position_enum: PositionPoint,
+        rutes: Vec<(PositionPoint, PositionPoint)>
     }
 
     impl Maze {
         pub fn new(start_position:(i32, i32), end_position:(i32, i32))-> Self{
+            // let end_position_enum = (
+            //     PositionPoint::Children(end_position)
+            // );
+
             Maze{
                 queue: Vec::new(),
                 processed: Vec::new(),
                 processing: None,
                 start_position,
                 end_position,
-                founded: false,
+                children_end_position_enum: PositionPoint::Children(end_position),
+                rutes: Vec::new(),
             }
         }
 
+        pub fn show_maze(&self, maze: &Vec<Vec<char>>){
+            for colls in maze{
+                println!("{:?}", colls)
+            }
+        }
+
+
+
         pub fn running_on_mize(&mut self, maze: Vec<Vec<char>>){
-            // println!("{:?}", maze);
-            
             self.queue.push(self.start_position);
             self.processing(maze);
-            println!("{:?}", self.queue);
 
         }
 
         fn processing(&mut self, maze: Vec<Vec<char>>){
 
             loop {
-                if self.queue.len() <= 0 || self.founded{
+                if self.queue.len() <= 0{
                     break;
                 }
 
-                println!("{:?} \n =======", self.queue);
                 self.processing = Some(*self.queue.get(0).unwrap());
                 self.processed.push(*self.queue.get(0).unwrap());
                 self.queue.remove(0);
-
                 self.check(&maze);
+                
+                if self.processing.unwrap() == self.end_position{
+                    break;
+                }
+  
+
             }
 
+        }
+
+        pub fn show_route_in_terminal(&self, mut maze: Vec<Vec<char>>){
+            let route = self.searching_chain();
+            println!("route is \n {:?} \n ====", route);
+
+            for (coll, row) in route{
+                maze[coll as usize][row as usize] = 'o';
+            }
+            println!("fast route is");
+            self.show_maze(&maze);
+        }
+
+        fn searching_chain(&self)-> Vec<(i32, i32)>{
+            let mut saving_value = self.children_end_position_enum;
+            let mut routes = vec![
+                saving_value,
+            ];
+
+            loop {
+                if let PositionPoint::Children(x) = saving_value{
+                    if x == self.start_position{
+                        break;
+                    }
+                }
+
+                let (mut _index_end, value_end) = self.rutes.clone().into_iter()
+                .enumerate()
+                .find(|(_, value)| {
+                    let children_end = value.1;
+                    if children_end == saving_value{
+                        true
+                    } else {
+                        false
+                    }
+                })
+                .unwrap();
+
+                let parent = value_end.0;
+                let parent = value_end.0.parent_to_children(parent)
+                    .unwrap();
+                routes.push(parent);
+                saving_value = parent;
+            }
+
+            let mut routes_raw:Vec<(i32, i32)> = routes.clone()
+            .into_iter()
+            .map(|cor|{
+              if let PositionPoint::Children(value) = cor {
+                  return value
+              } else {
+                  return (-1, -1)
+              }
+            })
+            .collect();
+            routes_raw.reverse();
+
+            return routes_raw;
         }
 
         fn check(&mut self, maze: &Vec<Vec<char>>){
@@ -53,22 +153,24 @@ pub mod maze {
                 let mut colls = self.processing.unwrap().0;
                 colls += value_check;
 
-                // println!("{} | {}", maze.len(), colls);
                 if colls >= 0 && maze.len() > colls as usize{
                     let row = self.processing.unwrap().1;
                     let _value = maze.get(colls as usize)
                         .unwrap()
                         .get(row as usize)
                         .unwrap();
-                    // println!("value in ({colls}, {row}) is {:?}", value);
+                    
                     if _value != &'#'{
-                        if !self.processed.contains(&(colls, row)){
-
-                            if (colls, row) == self.end_position{
-                                println!("founded!");
-                                self.founded = true;
-                            }
+                        if !self.processed.contains(&(colls, row)) && !self.queue.contains(&(colls, row)){
                             self.queue.push((colls, row));
+
+                            // rutes
+                            let routes = (
+                                PositionPoint::Parent(self.processing.unwrap()),
+                                PositionPoint::Children((colls, row))
+                            );
+
+                            self.rutes.push(routes);
                         }
                     }
                 }
@@ -83,15 +185,18 @@ pub mod maze {
                         .unwrap()
                         .get(rows as usize)
                         .unwrap();
-                    // println!("value in ({coll}, {rows}) is {:?}", value);
-                    if _value != &'#'{
-                        if !self.processed.contains(&(coll, rows)){
 
-                            if (coll, rows) == self.end_position{
-                                println!("founded!");
-                                self.founded = true;
-                            }
+                    if _value != &'#'{
+                        if !self.processed.contains(&(coll, rows)) && !self.queue.contains(&(coll, rows)){
                             self.queue.push((coll, rows));
+
+                            // rutes
+                            let routes = (
+                                PositionPoint::Parent(self.processing.unwrap()),
+                                PositionPoint::Children((coll, rows))
+                            );
+
+                            self.rutes.push(routes);
                         }
                     }
                 }
