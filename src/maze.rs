@@ -1,4 +1,5 @@
 pub mod maze {
+    use std::{os::unix::thread, process::Command, thread::sleep, time::Duration};
 
     #[derive(Debug, PartialEq, Clone, Copy)]
     enum PositionPoint {
@@ -33,11 +34,13 @@ pub mod maze {
         start_position: (i32, i32),
         end_position: (i32, i32),
         children_end_position_enum: PositionPoint,
-        rutes: Vec<(PositionPoint, PositionPoint)>
+        rutes: Vec<(PositionPoint, PositionPoint)>,
+        // opt
+        live_streaming: (bool, i32),
     }
 
     impl Maze {
-        pub fn new(start_position:(i32, i32), end_position:(i32, i32))-> Self{
+        pub fn new(start_position:(i32, i32), end_position:(i32, i32), live_streaming: (bool, i32))-> Self{
             // let end_position_enum = (
             //     PositionPoint::Children(end_position)
             // );
@@ -50,6 +53,8 @@ pub mod maze {
                 end_position,
                 children_end_position_enum: PositionPoint::Children(end_position),
                 rutes: Vec::new(),
+                // opt
+                live_streaming
             }
         }
 
@@ -78,6 +83,11 @@ pub mod maze {
                 self.processed.push(*self.queue.get(0).unwrap());
                 self.queue.remove(0);
                 self.check(&maze);
+
+                if self.live_streaming.0{
+                    self.live_streaming_fn(maze.clone());
+                    sleep(Duration::from_millis(self.live_streaming.1 as u64));
+                }
                 
                 if self.processing.unwrap() == self.end_position{
                     break;
@@ -88,15 +98,55 @@ pub mod maze {
 
         }
 
-        pub fn show_route_in_terminal(&self, mut maze: Vec<Vec<char>>){
+        pub fn live_streaming_fn(&self, mut maze: Vec<Vec<char>>){
+            let rutes_raw:Vec<(i32, i32)> = self.rutes.clone()
+                .into_iter()
+                .map(|(cordinate, _)|{
+                    if let PositionPoint::Parent(location) = cordinate {
+                        return location
+                    } else {
+                        (-1, -1)
+                    }
+                })
+                .collect();
+
+            for (colls, rows) in rutes_raw{
+                maze[colls as usize][rows as usize] = '@';
+            }
+
+            Command::new("clear")
+                .status()
+                .unwrap();
+            self.show_maze(&maze);
+        }
+
+        pub fn show_route_in_terminal(&self, mut maze: Vec<Vec<char>>, live_streaming: (bool, i32)){
             let route = self.searching_chain();
             println!("route is \n {:?} \n ====", route);
 
-            for (coll, row) in route{
-                maze[coll as usize][row as usize] = 'o';
+            if !live_streaming.0{
+
+                for (coll, row) in route{
+                    maze[coll as usize][row as usize] = '@';
+                    
+                }
+                println!("fast route is");
+                self.show_maze(&maze);
+            } else {
+
+                
+                
+                println!("fast route is");
+                for (coll, row) in route{
+                    maze[coll as usize][row as usize] = '@';
+                    Command::new("clear")
+                    .status()
+                    .unwrap();
+                    self.show_maze(&maze);
+                    sleep(Duration::from_millis(live_streaming.1 as u64));
+                }
             }
-            println!("fast route is");
-            self.show_maze(&maze);
+            
         }
 
         fn searching_chain(&self)-> Vec<(i32, i32)>{
