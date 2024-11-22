@@ -49,7 +49,7 @@ fn main() {
     ];
     
 
-    let mut maze_engine = Maze::new((0, 0), (0, 30), (true, 50));
+    let mut maze_engine = Maze::new((0, 0), (0, 30), (true, 100));
     // maze_engine.show_maze(&maze);
 
     maze_engine.running_on_mize(maze.clone());

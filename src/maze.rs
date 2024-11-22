@@ -1,5 +1,5 @@
 pub mod maze {
-    use std::{os::unix::thread, process::Command, thread::sleep, time::Duration};
+    use std::{process::Command, thread::sleep, time::Duration};
 
     #[derive(Debug, PartialEq, Clone, Copy)]
     enum PositionPoint {
